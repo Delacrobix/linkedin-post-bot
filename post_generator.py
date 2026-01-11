@@ -61,17 +61,39 @@ def build_workflow() -> StateGraph:
     return workflow.compile()
 
 
+class PostGenerationError(Exception):
+    """Raised when post generation fails."""
+
+    pass
+
+
 def generate_linkedin_post(title: str, description: str, body: str) -> str:
-    """Generate a LinkedIn post for an article."""
-    workflow = build_workflow()
+    """Generate a LinkedIn post for an article.
 
-    result = workflow.invoke(
-        {
-            "title": title,
-            "description": description,
-            "body": body,
-            "post_text": "",
-        }
-    )
+    Raises:
+        PostGenerationError: If generation fails or returns invalid content.
+    """
+    try:
+        workflow = build_workflow()
 
-    return result["post_text"]
+        result = workflow.invoke(
+            {
+                "title": title,
+                "description": description,
+                "body": body,
+                "post_text": "",
+            }
+        )
+
+        post_text = result.get("post_text", "")
+
+        # Validate the result
+        if not post_text or len(post_text.strip()) < 20:
+            raise PostGenerationError("Generated post is empty or too short")
+
+        return post_text
+
+    except PostGenerationError:
+        raise
+    except Exception as e:
+        raise PostGenerationError(f"Failed to generate post: {str(e)}")

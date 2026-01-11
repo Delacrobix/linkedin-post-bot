@@ -12,7 +12,7 @@ load_dotenv()
 
 import requests
 
-from post_generator import generate_linkedin_post
+from post_generator import PostGenerationError, generate_linkedin_post
 
 # Configuration
 BASE_DIR = Path(__file__).parent
@@ -196,7 +196,13 @@ def main():
     article = new_articles[0]
     print(f"Publishing: {article.get('title')}")
 
-    post_text = create_post_text(article)
+    # Generate post text with error handling
+    try:
+        post_text = create_post_text(article)
+    except PostGenerationError as e:
+        print(f"Error generating post text: {e}")
+        print("Aborting to prevent publishing invalid content")
+        return 1
 
     print("Generated post text:", post_text)
     print(f"Post text length: {len(post_text)} characters")
