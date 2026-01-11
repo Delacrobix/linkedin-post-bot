@@ -1,0 +1,37 @@
+name: Post to LinkedIn
+
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC (adjust to your timezone)
+    - cron: "0 9 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run LinkedIn poster
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          ARTICLES_API_URL: ${{ secrets.ARTICLES_API_URL }}
+        run: python main.py
+
+      - name: Commit published articles database
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add published.db
+          git diff --staged --quiet || git commit -m "Update published articles database"
+          git push

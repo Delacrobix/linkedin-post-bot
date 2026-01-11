@@ -1,0 +1,40 @@
+name: Token Renewal Reminder
+
+on:
+  schedule:
+    # Run every 55 days (token expires in 60)
+    - cron: "0 9 * * *"
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  check-and-remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if reminder is due
+        id: check
+        run: |
+          # Get last reminder issue date or use 55 days ago as default
+          DAYS_INTERVAL=55
+          TODAY=$(date +%s)
+
+          # This runs daily but only creates issue every 55 days
+          # Uses a simple modulo based on days since epoch
+          DAYS_SINCE_EPOCH=$((TODAY / 86400))
+          if [ $((DAYS_SINCE_EPOCH % DAYS_INTERVAL)) -eq 0 ]; then
+            echo "remind=true" >> $GITHUB_OUTPUT
+          else
+            echo "remind=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create reminder issue
+        if: steps.check.outputs.remind == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔑 Renew LinkedIn Access Token',
+              body: `## Token Renewal Required\n\nYour LinkedIn access token expires every 60 days.\n\n### Steps:\n1. Run \`python get_token.py\` locally\n2. Authorize in browser\n3. Copy the new token\n4. Update \`LINKEDIN_ACCESS_TOKEN\` in [Repository Secrets](/${context.repo.owner}/${context.repo.repo}/settings/secrets/actions)\n\nSee \`GET_TOKEN.md\` for details.`,
+              labels: ['reminder']
+            });
