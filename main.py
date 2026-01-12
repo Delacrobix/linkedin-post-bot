@@ -19,7 +19,7 @@ BASE_DIR = Path(__file__).parent
 DB_FILE = BASE_DIR / "published.db"
 BACKUP_DIR = BASE_DIR / "backups"
 LINKEDIN_API_URL = "https://api.linkedin.com/v2/ugcPosts"
-MIN_PUBLISH_DATE = datetime(2026, 1, 6, tzinfo=timezone.utc)
+MIN_PUBLISH_DATE = datetime(2025, 12, 11, tzinfo=timezone.utc)
 
 
 def init_db() -> None:
@@ -181,6 +181,7 @@ def main():
         if a.get("link") in published_urls:
             continue
         pub_date = parse_publish_date(a.get("publishedAt", ""))
+
         if pub_date and pub_date >= MIN_PUBLISH_DATE:
             new_articles.append(a)
 
