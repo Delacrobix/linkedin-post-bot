@@ -32,10 +32,16 @@ def init_db() -> None:
             url TEXT UNIQUE NOT NULL,
             title TEXT,
             linkedin_post_id TEXT,
+            post_text TEXT,
             published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """
     )
+    # Migration: add post_text column if missing (existing databases)
+    cursor = conn.execute("PRAGMA table_info(published_articles)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if "post_text" not in columns:
+        conn.execute("ALTER TABLE published_articles ADD COLUMN post_text TEXT")
     conn.commit()
     conn.close()
 
@@ -63,15 +69,30 @@ def get_published_urls() -> set[str]:
     cursor = conn.execute("SELECT url FROM published_articles")
     urls = {row[0] for row in cursor.fetchall()}
     conn.close()
+
     return urls
 
 
-def save_published_article(url: str, title: str, linkedin_post_id: str) -> None:
+def get_recent_post_texts(limit: int = 3) -> list[str]:
+    """Get the most recent post texts from the database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.execute(
+        "SELECT post_text FROM published_articles WHERE post_text IS NOT NULL ORDER BY published_at DESC LIMIT ?",
+        (limit,),
+    )
+    texts = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return texts
+
+
+def save_published_article(
+    url: str, title: str, linkedin_post_id: str, post_text: str
+) -> None:
     """Save a published article to the database."""
     conn = sqlite3.connect(DB_FILE)
     conn.execute(
-        "INSERT INTO published_articles (url, title, linkedin_post_id) VALUES (?, ?, ?)",
-        (url, title, linkedin_post_id),
+        "INSERT INTO published_articles (url, title, linkedin_post_id, post_text) VALUES (?, ?, ?, ?)",
+        (url, title, linkedin_post_id, post_text),
     )
     conn.commit()
     conn.close()
@@ -140,13 +161,13 @@ def post_to_linkedin(
     return response.json()
 
 
-def create_post_text(article: dict) -> str:
+def create_post_text(article: dict, previous_posts: list[str]) -> str:
     """Generate post text for an article using AI."""
     title = article.get("title", "")
     description = article.get("description", "")
     body = article.get("body", "")
 
-    post_text = generate_linkedin_post(title, description, body)
+    post_text = generate_linkedin_post(title, description, body, previous_posts)
 
     return post_text  # LinkedIn limit is ~3000 chars
 
@@ -197,9 +218,12 @@ def main():
     article = new_articles[0]
     print(f"Publishing: {article.get('title')}")
 
+    # Fetch recent posts to avoid repetitive style
+    previous_posts = get_recent_post_texts()
+
     # Generate post text with error handling
     try:
-        post_text = create_post_text(article)
+        post_text = create_post_text(article, previous_posts)
     except PostGenerationError as e:
         print(f"Error generating post text: {e}")
         print("Aborting to prevent publishing invalid content")
@@ -216,7 +240,7 @@ def main():
 
     # Backup and save to database
     backup_db()
-    save_published_article(article_url, article.get("title"), linkedin_post_id)
+    save_published_article(article_url, article.get("title"), linkedin_post_id, post_text)
     print("Saved to database")
 
     return 0
