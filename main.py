@@ -240,7 +240,9 @@ def main():
 
     # Backup and save to database
     backup_db()
-    save_published_article(article_url, article.get("title"), linkedin_post_id, post_text)
+    save_published_article(
+        article_url, article.get("title"), linkedin_post_id, post_text
+    )
     print("Saved to database")
 
     return 0
